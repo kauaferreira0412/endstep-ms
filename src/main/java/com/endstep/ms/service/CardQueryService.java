@@ -99,7 +99,7 @@ public class CardQueryService {
         List<CardSummary> content = rows.stream().map(CardQueryService::rowToSummary).toList();
 
         Query countQ = em.createNativeQuery("select count(*) from card_oracles o where " + b.where);
-        bind(countQ, b.params);
+        bind(countQ, b.params.subList(0, b.whereParamCount));
         long total = ((Number) countQ.getSingleResult()).longValue();
 
         return PageResponse.of(content, page, size, total);

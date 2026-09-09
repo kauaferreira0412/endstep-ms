@@ -17,6 +17,7 @@ final class CardSearchSql {
     final String where;
     final String orderBy;
     final List<Object> params = new ArrayList<>();
+    final int whereParamCount;
 
     CardSearchSql(CardQuery q) {
         List<String> cond = new ArrayList<>();
@@ -68,6 +69,7 @@ final class CardSearchSql {
         }
 
         this.where = cond.isEmpty() ? "true" : String.join(" and ", cond);
+        this.whereParamCount = params.size();
 
         if (!q.nameTerms().isEmpty()) {
             String joined = String.join(" ", q.nameTerms());

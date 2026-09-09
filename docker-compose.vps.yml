@@ -70,7 +70,7 @@ services:
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "8"
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       ENDSTEP_SCRYFALL_DOWNLOAD_DIR: /app/.data/scryfall
-      ENDSTEP_SCRYFALL_USER_AGENT: ${ENDSTEP_SCRYFALL_USER_AGENT:-endstep/1.0 (contato: troque-me@example.com)}
+      ENDSTEP_SCRYFALL_USER_AGENT: "${ENDSTEP_SCRYFALL_USER_AGENT:-endstep/1.0 (+https://github.com/kauaferreira0412/endstep-ms)}"
       ENDSTEP_CARD_SYNC_RUN_ON_STARTUP: "false"
       ENDSTEP_JWT_SECRET: ${ENDSTEP_JWT_SECRET:?defina ENDSTEP_JWT_SECRET (>=32 chars) no .env}
       ENDSTEP_FRONTEND_URL: ${ENDSTEP_PUBLIC_URL:?defina ENDSTEP_PUBLIC_URL no .env}

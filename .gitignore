@@ -1,0 +1,19 @@
+target/
+.data/
+*.log
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# env local (nunca commitar segredos)
+.env
+.env.local
+.env.*.local

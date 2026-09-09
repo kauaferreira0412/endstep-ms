@@ -1,0 +1,104 @@
+name: endstep
+
+networks:
+  proxy:
+    external: true
+    name: ${ENDSTEP_PROXY_NETWORK:?informe a rede docker do Caddy (ex.: concorde_default)}
+  internal:
+    driver: bridge
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: endstep-db
+    environment:
+      POSTGRES_DB: endstep
+      POSTGRES_USER: endstep
+      POSTGRES_PASSWORD: ${ENDSTEP_DB_PASSWORD:?defina ENDSTEP_DB_PASSWORD no .env}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=192MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=192MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - max_connections=20
+      - -c
+      - synchronous_commit=off
+      - -c
+      - wal_compression=on
+    volumes:
+      - ./.data/pg:/var/lib/postgresql/data
+    networks:
+      - internal
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: "0.75"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U endstep -d endstep"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: endstep-ms:vps
+    container_name: endstep-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/endstep
+      SPRING_DATASOURCE_USERNAME: endstep
+      SPRING_DATASOURCE_PASSWORD: ${ENDSTEP_DB_PASSWORD}
+      SPRING_AUTOCONFIGURE_EXCLUDE: >-
+        org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "8"
+      ENDSTEP_SCRYFALL_DOWNLOAD_DIR: /app/.data/scryfall
+      ENDSTEP_SCRYFALL_USER_AGENT: ${ENDSTEP_SCRYFALL_USER_AGENT:-endstep/1.0 (contato: troque-me@example.com)}
+      ENDSTEP_CARD_SYNC_RUN_ON_STARTUP: "false"
+      ENDSTEP_JWT_SECRET: ${ENDSTEP_JWT_SECRET:?defina ENDSTEP_JWT_SECRET (>=32 chars) no .env}
+      ENDSTEP_FRONTEND_URL: ${ENDSTEP_PUBLIC_URL:?defina ENDSTEP_PUBLIC_URL (ex.: https://endstep.seudominio.com)}
+      ENDSTEP_AUTH_ADMIN_EMAILS_0: ${ENDSTEP_ADMIN_EMAIL:-kauafrreira23@gmail.com}
+      ENDSTEP_STORAGE_TYPE: ${ENDSTEP_STORAGE_TYPE:-local}
+      ENDSTEP_STORAGE_LOCAL_DIR: /app/.data/uploads
+      ENDSTEP_STORAGE_PUBLIC_BASE_URL: ${ENDSTEP_PUBLIC_URL}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_TRANSLATE_API_KEY: ${GOOGLE_TRANSLATE_API_KEY:-}
+      ENDSTEP_TRANSLATION_ENABLED: ${ENDSTEP_TRANSLATION_ENABLED:-true}
+      JAVA_OPTS: "-XX:MaxRAMPercentage=55 -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom"
+    volumes:
+      - ./.data/scryfall:/app/.data/scryfall
+      - ./.data/uploads:/app/.data/uploads
+    networks:
+      - internal
+      - proxy
+    mem_limit: 1200m
+    memswap_limit: 1200m
+    cpus: "0.9"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../endstep-fe
+      dockerfile: Dockerfile
+    image: endstep-fe:vps
+    container_name: endstep-frontend
+    networks:
+      - proxy
+    mem_limit: 96m
+    cpus: "0.25"
+    restart: unless-stopped

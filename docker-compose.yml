@@ -1,0 +1,50 @@
+name: endstep-ms
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: endstep-ms:local
+    container_name: endstep-ms-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      ENDSTEP_SCRYFALL_USER_AGENT: "endstep-ms/0.1 (contato: troque-me@example.com)"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./.data/scryfall:/app/.data/scryfall
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: endstep-ms-postgres
+    environment:
+      POSTGRES_DB: endstep
+      POSTGRES_USER: endstep
+      POSTGRES_PASSWORD: endstep
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U endstep -d endstep"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: endstep-ms-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - ./.data/redis:/data
+    restart: unless-stopped

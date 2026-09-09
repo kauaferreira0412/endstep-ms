@@ -157,8 +157,6 @@ public class DeckPdfService {
                 .c img { display: block; width: 35mm; height: 48.9mm; border-radius: 1.2mm; }
                 .c .noimg { display: table-cell; width: 35mm; height: 48.9mm; border: 0.3mm solid #bbb; border-radius: 1.2mm;
                             vertical-align: middle; text-align: center; font-size: 7pt; color: #777; }
-                .big { width: 63mm; margin: 0 2mm 2mm 0; }
-                .big img, .big .noimg { width: 63mm; height: 88mm; }
                 </style></head><body>
                 """);
 
@@ -173,7 +171,7 @@ public class DeckPdfService {
         if (!commander.isEmpty()) {
             sb.append("<h2>Comandante</h2><div class=\"grid\">");
             for (DeckCardRow r : commander) {
-                sb.append(cardHtml(r, imgByOracle, true));
+                sb.append(cardHtml(r, imgByOracle));
             }
             sb.append("</div>");
         }
@@ -208,18 +206,17 @@ public class DeckPdfService {
                             TYPE_ORDER.indexOf(primaryType(b.getTypeLine())));
                     return t != 0 ? t : a.getName().compareToIgnoreCase(b.getName());
                 })
-                .forEach(r -> sb.append(cardHtml(r, imgByOracle, false)));
+                .forEach(r -> sb.append(cardHtml(r, imgByOracle)));
     }
 
-    private String cardHtml(DeckCardRow r, Map<String, String> imgByOracle, boolean big) {
+    private String cardHtml(DeckCardRow r, Map<String, String> imgByOracle) {
         String img = imgByOracle.get(r.getOracleId().toString() + ":" + r.getSection());
-        String cls = big ? "c big" : "c";
         String label = r.getDisplayName() != null && !r.getDisplayName().isBlank()
                 ? r.getDisplayName() : r.getName();
         String one = img != null
-                ? "<div class=\"" + cls + "\"><img src=\"" + img + "\"/></div>"
-                : "<div class=\"" + cls + "\"><div class=\"noimg\">" + esc(label) + "</div></div>";
-        int copies = big ? 1 : Math.max(1, r.getQuantity());
+                ? "<div class=\"c\"><img src=\"" + img + "\"/></div>"
+                : "<div class=\"c\"><div class=\"noimg\">" + esc(label) + "</div></div>";
+        int copies = Math.max(1, r.getQuantity());
         return one.repeat(copies);
     }
 

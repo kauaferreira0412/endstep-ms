@@ -120,6 +120,7 @@ public class GameEngine {
             case "PASS_TURN" -> passTurn(game, players, res, names);
             case "SET_PHASE" -> setPhase(game, players, res, me, msg);
             case "SURRENDER" -> surrender(game, players, requireActor(actor), res, me);
+            case "LEAVE_GAME" -> leaveGame(game, players, requireActor(actor), res, me, names);
             default -> throw new ResponseStatusException(BAD_REQUEST, "Acao desconhecida: " + msg.type());
         }
 
@@ -843,6 +844,25 @@ public class GameEngine {
             game.setFinishedAt(java.time.Instant.now());
         }
         res.eventType("PLAYER_LEFT").logLine(me + " desistiu da partida");
+    }
+
+    private void leaveGame(Game game, List<GamePlayer> players, GamePlayer actor, EngineResult res, String me,
+                           Map<Long, String> names) {
+        actor.setStatus(GamePlayer.Status.LEFT.name());
+        actor.setConnected(false);
+        gamePlayers.save(actor);
+        res.player(actor.getUserId());
+
+        long alive = players.stream()
+                .filter(p -> GamePlayer.Status.PLAYING.name().equals(p.getStatus()))
+                .count();
+        if (alive <= 1) {
+            game.setStatus(Game.Status.FINISHED.name());
+            game.setFinishedAt(java.time.Instant.now());
+        } else if (game.getActiveSeat() == actor.getSeat()) {
+            passTurn(game, players, res, names);
+        }
+        res.eventType("PLAYER_LEFT").logLine(me + " saiu da partida");
     }
 
     private static double clamp01(double v) {

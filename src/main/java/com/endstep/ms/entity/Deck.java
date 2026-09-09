@@ -38,6 +38,9 @@ public class Deck {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    @Column(name = "suggested_by_user_id")
+    private Long suggestedByUserId;
+
     @Column(name = "folder_id")
     private Long folderId;
 

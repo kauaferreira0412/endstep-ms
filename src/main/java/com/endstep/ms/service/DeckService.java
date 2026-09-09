@@ -58,10 +58,11 @@ public class DeckService {
     private final CardOracleRepository oracles;
     private final CustomArtRepository customArts;
     private final DeckValidationService validation;
+    private final com.endstep.ms.repository.UserRepository userRepo;
 
     public DeckService(DeckRepository decks, DeckCardRepository deckCards, DeckFolderRepository folders,
                        FormatRepository formats, CardOracleRepository oracles, CustomArtRepository customArts,
-                       DeckValidationService validation) {
+                       DeckValidationService validation, com.endstep.ms.repository.UserRepository userRepo) {
         this.decks = decks;
         this.deckCards = deckCards;
         this.folders = folders;
@@ -69,6 +70,7 @@ public class DeckService {
         this.oracles = oracles;
         this.customArts = customArts;
         this.validation = validation;
+        this.userRepo = userRepo;
     }
 
     @Transactional(readOnly = true)
@@ -292,9 +294,13 @@ public class DeckService {
         DeckStats stats = computeStats(rows);
         ValidationResult val = validation.validate(fmt, rows);
 
+        String suggestedBy = d.getSuggestedByUserId() == null ? null
+                : userRepo.findById(d.getSuggestedByUserId()).map(u -> u.getDisplayName()).orElse(null);
+
         return new DeckDetail(d.getId(), d.getFolderId(), folderPath(userId, d.getFolderId()),
                 d.getName(), d.getFormat(), d.getDescription(), d.getVisibility(), d.getColorIdentity(),
-                d.isFavorite(), FormatView.of(fmt), cards, stats, val, d.getCreatedAt(), d.getUpdatedAt());
+                d.isFavorite(), FormatView.of(fmt), cards, stats, val,
+                d.getSuggestedByUserId(), suggestedBy, d.getCreatedAt(), d.getUpdatedAt());
     }
 
     private DeckStats computeStats(List<DeckCardRow> rows) {

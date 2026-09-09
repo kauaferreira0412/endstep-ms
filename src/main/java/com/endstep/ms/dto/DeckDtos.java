@@ -97,6 +97,8 @@ public final class DeckDtos {
             List<DeckCardView> cards,
             DeckStats stats,
             ValidationResult validation,
+            Long suggestedByUserId,
+            String suggestedByUsername,
             Instant createdAt,
             Instant updatedAt
     ) {

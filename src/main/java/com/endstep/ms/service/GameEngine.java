@@ -26,6 +26,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -113,6 +114,7 @@ public class GameEngine {
             case "CASCADE", "DISCOVER" -> cascade(game, requireActor(actor), actorUserId, players, res, me, msg);
             case "CREATE_TOKEN" -> createToken(game, actorUserId, res, me, msg);
             case "COPY_CARD" -> copyCard(game, actorUserId, res, me, msg);
+            case "ADD_CARD" -> addCard(game, actorUserId, res, me, msg);
             case "REVEAL_CARD" -> revealCard(players, actorUserId, res, me, msg, true);
             case "HIDE_CARD" -> revealCard(players, actorUserId, res, me, msg, false);
             case "PASS_TURN" -> passTurn(game, players, res, names);
@@ -613,6 +615,54 @@ public class GameEngine {
         res.player(actorUserId).eventType("CARD_PLAYED")
                 .logLine(me + " criou " + count + (count == 1 ? " ficha " : " fichas ") + name
                         + (pt != null ? " " + pt : ""));
+    }
+
+    private void addCard(Game game, long actorUserId, EngineResult res, String me, GameActionMessage msg) {
+        Long oracleCardId = msg.getLongOrNull("oracleCardId");
+        String oracleId = msg.getString("oracleId");
+        CardOracle oracle;
+        if (oracleCardId != null) {
+            oracle = cardOracles.findById(oracleCardId)
+                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Carta nao encontrada"));
+        } else if (oracleId != null && !oracleId.isBlank()) {
+            UUID u;
+            try {
+                u = UUID.fromString(oracleId.trim());
+            } catch (IllegalArgumentException e) {
+                throw new ResponseStatusException(BAD_REQUEST, "oracleId invalido");
+            }
+            oracle = cardOracles.findByOracleId(u)
+                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Carta nao encontrada"));
+        } else {
+            throw new ResponseStatusException(BAD_REQUEST, "Informe oracleId ou oracleCardId");
+        }
+
+        GameCard.Zone zone = "HAND".equalsIgnoreCase(msg.getString("zone"))
+                ? GameCard.Zone.HAND : GameCard.Zone.BATTLEFIELD;
+        int count = Math.max(1, Math.min(msg.getInt("count", 1), 20));
+        int basePos = zone == GameCard.Zone.HAND
+                ? zone(game.getId(), actorUserId, GameCard.Zone.HAND).size() : 0;
+
+        for (int i = 0; i < count; i++) {
+            GameCard c = new GameCard();
+            c.setGameId(game.getId());
+            c.setOwnerUserId(actorUserId);
+            c.setControllerUserId(actorUserId);
+            c.setOracleCardId(oracle.getId());
+            c.setToken(true);
+            c.setZone(zone.name());
+            if (zone == GameCard.Zone.BATTLEFIELD) {
+                c.setX(BigDecimal.valueOf(0.3 + (i % 5) * 0.09));
+                c.setY(BigDecimal.valueOf(0.62));
+            } else {
+                c.setPosition(basePos + i);
+            }
+            gameCards.save(c);
+            res.card(c.getId());
+        }
+        res.player(actorUserId).eventType("CARD_PLAYED")
+                .logLine(me + " adicionou " + count + "x " + oracle.getName()
+                        + (zone == GameCard.Zone.HAND ? " à mão" : " ao campo"));
     }
 
     private void copyCard(Game game, long actorUserId, EngineResult res, String me, GameActionMessage msg) {

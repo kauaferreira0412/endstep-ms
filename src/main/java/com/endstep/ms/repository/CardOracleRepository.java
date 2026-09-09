@@ -44,8 +44,11 @@ public interface CardOracleRepository extends JpaRepository<CardOracle, Long> {
                 order by (cp.lang = 'en') desc, cp.released_at desc nulls last, cp.id desc
                 limit 1
             ) p on true
-            where (:q = '' or o.name ilike '%' || :q || '%')
-            order by (lower(o.name) = lower(:q)) desc,
+            where (:q = ''
+                   or o.name ilike '%' || :q || '%'
+                   or o.type_line ilike '%' || :q || '%')
+            order by (o.name ilike '%' || :q || '%') desc,
+                     (lower(o.name) = lower(:q)) desc,
                      (o.name ilike :q || '%') desc,
                      similarity(o.name, :q) desc,
                      o.name asc
@@ -57,7 +60,9 @@ public interface CardOracleRepository extends JpaRepository<CardOracle, Long> {
 
     @Query(value = """
             select count(*) from card_oracles o
-            where (:q = '' or o.name ilike '%' || :q || '%')
+            where (:q = ''
+                   or o.name ilike '%' || :q || '%'
+                   or o.type_line ilike '%' || :q || '%')
             """, nativeQuery = true)
     long countSearch(@Param("q") String q);
 

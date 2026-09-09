@@ -1,5 +1,12 @@
 name: endstep
 
+# Sobe SO o Endstep (db + backend + front nginx), com teto de RAM/CPU por
+# container, sem publicar nenhuma porta no host. O Caddy (rede externa
+# "webproxy") alcanca o front por "endstep-frontend:80".
+#
+#   cp .env.vps.example .env   # e preencher
+#   docker compose -f docker-compose.vps.yml up -d --build
+
 networks:
   proxy:
     external: true
@@ -8,7 +15,7 @@ networks:
     driver: bridge
 
 services:
-  db:
+  endstep-db:
     image: postgres:16-alpine
     container_name: endstep-db
     environment:
@@ -45,17 +52,17 @@ services:
       retries: 18
     restart: unless-stopped
 
-  backend:
+  endstep-backend:
     build:
       context: .
       dockerfile: Dockerfile
     image: endstep-ms:vps
     container_name: endstep-backend
     depends_on:
-      db:
+      endstep-db:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/endstep
+      SPRING_DATASOURCE_URL: jdbc:postgresql://endstep-db:5432/endstep
       SPRING_DATASOURCE_USERNAME: endstep
       SPRING_DATASOURCE_PASSWORD: ${ENDSTEP_DB_PASSWORD}
       SPRING_AUTOCONFIGURE_EXCLUDE: >-
@@ -66,7 +73,7 @@ services:
       ENDSTEP_SCRYFALL_USER_AGENT: ${ENDSTEP_SCRYFALL_USER_AGENT:-endstep/1.0 (contato: troque-me@example.com)}
       ENDSTEP_CARD_SYNC_RUN_ON_STARTUP: "false"
       ENDSTEP_JWT_SECRET: ${ENDSTEP_JWT_SECRET:?defina ENDSTEP_JWT_SECRET (>=32 chars) no .env}
-      ENDSTEP_FRONTEND_URL: ${ENDSTEP_PUBLIC_URL:?defina ENDSTEP_PUBLIC_URL (ex.: https://endstep.seudominio.com)}
+      ENDSTEP_FRONTEND_URL: ${ENDSTEP_PUBLIC_URL:?defina ENDSTEP_PUBLIC_URL no .env}
       ENDSTEP_AUTH_ADMIN_EMAILS_0: ${ENDSTEP_ADMIN_EMAIL:-kauafrreira23@gmail.com}
       ENDSTEP_STORAGE_TYPE: ${ENDSTEP_STORAGE_TYPE:-local}
       ENDSTEP_STORAGE_LOCAL_DIR: /app/.data/uploads
@@ -92,12 +99,14 @@ services:
     cpus: "0.9"
     restart: unless-stopped
 
-  frontend:
+  endstep-frontend:
     build:
       context: ../endstep-fe
       dockerfile: Dockerfile
     image: endstep-fe:vps
     container_name: endstep-frontend
+    depends_on:
+      - endstep-backend
     networks:
       - proxy
     mem_limit: 96m

@@ -3,7 +3,7 @@ name: endstep
 networks:
   proxy:
     external: true
-    name: ${ENDSTEP_PROXY_NETWORK:?informe a rede docker do Caddy (ex.: concorde_default)}
+    name: ${ENDSTEP_PROXY_NETWORK:-webproxy}
   internal:
     driver: bridge
 

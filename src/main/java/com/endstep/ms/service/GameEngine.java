@@ -419,9 +419,33 @@ public class GameEngine {
         Long absolute = msg.getLongOrNull("absolute");
         int newLife = absolute != null ? absolute.intValue() : gp.getLifeTotal() + msg.getInt("delta", 0);
         gp.setLifeTotal(newLife);
+
+        String nm = names.getOrDefault(targetId, "?");
+        String extra = "";
+        if (newLife <= 0 && GamePlayer.Status.PLAYING.name().equals(gp.getStatus())) {
+            gp.setStatus(GamePlayer.Status.LOST.name());
+            extra = " — eliminado";
+            checkGameOver(gp, players);
+        } else if (newLife > 0 && GamePlayer.Status.LOST.name().equals(gp.getStatus())) {
+            gp.setStatus(GamePlayer.Status.PLAYING.name());
+            extra = " — de volta à partida";
+        }
         gamePlayers.save(gp);
         res.player(gp.getUserId()).eventType("LIFE_CHANGED")
-                .logLine(names.getOrDefault(targetId, "?") + " agora com " + newLife + " de vida");
+                .logLine(nm + " agora com " + newLife + " de vida" + extra);
+    }
+
+    private void checkGameOver(GamePlayer justOut, List<GamePlayer> players) {
+        long alive = players.stream()
+                .filter(p -> p != justOut && GamePlayer.Status.PLAYING.name().equals(p.getStatus()))
+                .count();
+        if (alive <= 1) {
+            games.findById(justOut.getGameId()).ifPresent(g -> {
+                g.setStatus(Game.Status.FINISHED.name());
+                g.setFinishedAt(java.time.Instant.now());
+                games.save(g);
+            });
+        }
     }
 
     private void commanderDamage(List<GamePlayer> players, EngineResult res, Map<Long, String> names,

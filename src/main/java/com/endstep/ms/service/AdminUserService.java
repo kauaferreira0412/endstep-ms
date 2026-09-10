@@ -50,6 +50,20 @@ public class AdminUserService {
         return toView(u, saved);
     }
 
+    @Transactional
+    public void deleteUser(Long userId, Long adminId) {
+        if (userId.equals(adminId)) {
+            throw new IllegalArgumentException("Voce nao pode excluir a sua propria conta.");
+        }
+        User u = users.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Usuario nao encontrado: " + userId));
+        boolean isAdmin = u.getRoles().stream().anyMatch(r -> "ADMIN".equals(r.getName()));
+        if (isAdmin) {
+            throw new IllegalArgumentException("Nao e possivel excluir outro ADMIN.");
+        }
+        users.delete(u);
+    }
+
     public List<PermissionCatalogItem> catalog() {
         return AppPermission.all().stream()
                 .map(p -> new PermissionCatalogItem(p.name(), p.label()))

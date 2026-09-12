@@ -119,6 +119,7 @@ public class GameEngine {
             case "HIDE_CARD" -> revealCard(players, actorUserId, res, me, msg, false);
             case "PASS_TURN" -> passTurn(game, players, res, names);
             case "SET_PHASE" -> setPhase(game, players, res, me, msg);
+            case "REORDER_HAND" -> reorderHand(game, actorUserId, res, msg);
             case "SURRENDER" -> surrender(game, players, requireActor(actor), res, me);
             case "LEAVE_GAME" -> leaveGame(game, players, requireActor(actor), res, me, names);
             default -> throw new ResponseStatusException(BAD_REQUEST, "Acao desconhecida: " + msg.type());
@@ -158,6 +159,29 @@ public class GameEngine {
             list.get(i).setPosition(i);
         }
         gameCards.saveAll(list);
+    }
+
+    private void reorderHand(Game game, long actorUserId, EngineResult res, GameActionMessage msg) {
+        Object raw = msg.payloadOrEmpty().get("cardIds");
+        if (!(raw instanceof List<?> ids)) {
+            return;
+        }
+        List<GameCard> hand = zone(game.getId(), actorUserId, GameCard.Zone.HAND);
+        Map<Long, GameCard> byId = hand.stream().collect(Collectors.toMap(GameCard::getId, c -> c));
+        List<GameCard> ordered = new ArrayList<>();
+        for (Object o : ids) {
+            if (o instanceof Number n) {
+                GameCard c = byId.remove(n.longValue());
+                if (c != null) {
+                    ordered.add(c);
+                }
+            }
+        }
+        ordered.addAll(byId.values());
+        reindex(ordered);
+        for (GameCard c : ordered) {
+            res.card(c.getId());
+        }
     }
 
     private GameCard card(long cardId, long gameId) {

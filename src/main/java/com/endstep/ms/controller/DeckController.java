@@ -120,10 +120,11 @@ public class DeckController {
     public ResponseEntity<byte[]> export(@AuthenticationPrincipal AuthPrincipal me,
                                          @PathVariable long id,
                                          @RequestParam(defaultValue = "txt") String format) {
-        if ("pdf".equalsIgnoreCase(format)) {
+        if ("pdf".equalsIgnoreCase(format) || "pdf-proxy".equalsIgnoreCase(format)) {
+            boolean proxy = "pdf-proxy".equalsIgnoreCase(format);
             DeckDetail d = decks.detail(me.id(), id);
-            byte[] body = pdf.render(me.id(), id);
-            String filename = slug(d.name()) + ".pdf";
+            byte[] body = proxy ? pdf.renderProxy(me.id(), id) : pdf.render(me.id(), id);
+            String filename = slug(d.name()) + (proxy ? "_proxy" : "") + ".pdf";
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION,
                             ContentDisposition.attachment().filename(filename).build().toString())

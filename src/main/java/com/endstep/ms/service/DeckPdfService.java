@@ -90,6 +90,83 @@ public class DeckPdfService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public byte[] renderProxy(long userId, long deckId) {
+        Deck deck = deckService.requireDeck(userId, deckId);
+        List<DeckCardRow> rows = deckCards.loadRows(deckId, deck.getFormat());
+
+        Map<String, String> imgById = fetchImages(rows);
+        String html = buildProxyHtml(deck, rows, imgById);
+
+        try {
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
+            PdfRendererBuilder builder = new PdfRendererBuilder();
+            builder.useFastMode();
+            builder.useFont(() -> DeckPdfService.class.getResourceAsStream("/fonts/DejaVuSans.ttf"), "DejaVu Sans");
+            builder.withHtmlContent(html, null);
+            builder.toStream(os);
+            builder.run();
+            return os.toByteArray();
+        } catch (Exception e) {
+            log.error("Falha ao gerar PDF proxy do deck {}", deckId, e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Falha ao gerar o PDF");
+        }
+    }
+
+    private String buildProxyHtml(Deck deck, List<DeckCardRow> rows, Map<String, String> imgByOracle) {
+        List<DeckCardRow> printable = rows.stream()
+                .filter(r -> "COMMANDER".equals(r.getSection()) || "MAINBOARD".equals(r.getSection()))
+                .sorted((a, b) -> {
+                    int t = Integer.compare(TYPE_ORDER.indexOf(primaryType(a.getTypeLine())),
+                            TYPE_ORDER.indexOf(primaryType(b.getTypeLine())));
+                    return t != 0 ? t : a.getName().compareToIgnoreCase(b.getName());
+                })
+                .toList();
+
+        List<String> cards = new ArrayList<>();
+        for (DeckCardRow r : printable) {
+            String img = imgByOracle.get(r.getOracleId().toString() + ":" + r.getSection());
+            String label = r.getDisplayName() != null && !r.getDisplayName().isBlank()
+                    ? r.getDisplayName() : r.getName();
+            String cell = img != null
+                    ? "<div class=\"c\"><img src=\"" + img + "\"/></div>"
+                    : "<div class=\"c\"><div class=\"noimg\">" + esc(label) + "</div></div>";
+            for (int i = 0; i < Math.max(1, r.getQuantity()); i++) {
+                cards.add(cell);
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("""
+                <!DOCTYPE html><html><head><meta charset="utf-8"/><style>
+                @page { size: A4; margin: 7mm; }
+                * { box-sizing: border-box; }
+                body { font-family: "DejaVu Sans", sans-serif; }
+                .page { display: grid; grid-template-columns: repeat(3, 63mm); grid-template-rows: repeat(3, 88mm);
+                        justify-content: center; column-gap: 3.5mm; row-gap: 9.5mm; page-break-after: always; }
+                .page:last-child { page-break-after: auto; }
+                .c { width: 63mm; height: 88mm; }
+                .c img { display: block; width: 63mm; height: 88mm; border-radius: 2.5mm; }
+                .c .noimg { display: table-cell; width: 63mm; height: 88mm; border: 0.4mm solid #bbb; border-radius: 2.5mm;
+                            vertical-align: middle; text-align: center; font-size: 9pt; color: #777; }
+                </style></head><body>
+                """);
+
+        for (int i = 0; i < cards.size(); i += 9) {
+            sb.append("<div class=\"page\">");
+            for (int j = i; j < Math.min(i + 9, cards.size()); j++) {
+                sb.append(cards.get(j));
+            }
+            sb.append("</div>");
+        }
+        if (cards.isEmpty()) {
+            sb.append("<p>Deck sem cartas pra imprimir.</p>");
+        }
+
+        sb.append("</body></html>");
+        return sb.toString();
+    }
+
     private Map<String, String> fetchImages(List<DeckCardRow> rows) {
         Map<String, String> urlByOracle = new LinkedHashMap<>();
         for (DeckCardRow r : rows) {

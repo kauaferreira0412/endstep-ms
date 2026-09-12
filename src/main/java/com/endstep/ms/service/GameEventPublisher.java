@@ -114,6 +114,13 @@ public class GameEventPublisher {
         }
     }
 
+    public void broadcastSearching(long gameId, long searchingUserId, boolean active) {
+        Map<String, Object> data = Map.of("userId", searchingUserId, "active", active);
+        for (Long uid : gameView.participantUserIds(gameId)) {
+            messaging.convertAndSendToUser(String.valueOf(uid), dest(gameId), envelope("SEARCHING", data));
+        }
+    }
+
     private Map<String, Object> envelope(String type, Object data) {
         Map<String, Object> m = new java.util.HashMap<>();
         m.put("type", type);

@@ -76,6 +76,14 @@ public class GameSocketController {
         }
     }
 
+    @MessageMapping("/game/{gameId}/searching")
+    public void searching(@DestinationVariable long gameId, Principal principal, @Payload Map<String, Object> body) {
+        long userId = uid(principal);
+        requireParticipant(gameId, userId);
+        boolean active = Boolean.TRUE.equals(body.get("active"));
+        publisher.broadcastSearching(gameId, userId, active);
+    }
+
     @MessageMapping("/game/{gameId}/chat")
     public void chat(@DestinationVariable long gameId, Principal principal, @Payload Map<String, Object> body) {
         long userId = uid(principal);

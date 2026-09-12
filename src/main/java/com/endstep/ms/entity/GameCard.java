@@ -93,6 +93,9 @@ public class GameCard {
     private boolean faceDown = false;
 
     @Column(nullable = false)
+    private boolean transformed = false;
+
+    @Column(nullable = false)
     private int rotation = 0;
 
     @JdbcTypeCode(SqlTypes.JSON)

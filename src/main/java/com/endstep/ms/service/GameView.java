@@ -158,12 +158,15 @@ public class GameView {
         };
 
         boolean isToken = Boolean.TRUE.equals(r.getToken());
+        boolean hasBackFace = r.getBackName() != null;
         CardIdentity identity = showIdentity ? new CardIdentity(
                 r.getOracleCardId(), r.getPrintingId(), r.getCustomArtId(),
                 r.getName(), r.getDisplayName(), r.getTypeLine(), r.getManaCost(), toDouble(r.getManaValue()),
                 r.getOracleText(), r.getColorIdentity(),
                 r.getImageSmall(), r.getImageNormal(), r.getImageLarge(),
-                isToken, r.getTokenPt(), r.getTokenColors()) : null;
+                isToken, r.getTokenPt(), r.getTokenColors(),
+                hasBackFace, r.getBackName(), r.getBackTypeLine(), r.getBackManaCost(), r.getBackOracleText(),
+                r.getBackImageSmall(), r.getBackImageNormal(), r.getBackImageLarge()) : null;
 
         return new GameCardView(
                 r.getId(), r.getOwnerUserId(), r.getControllerUserId(), r.getZone(),
@@ -171,6 +174,7 @@ public class GameView {
                 toDouble(r.getX()), toDouble(r.getY()),
                 Boolean.TRUE.equals(r.getTapped()), faceDown,
                 r.getRotation() == null ? 0 : r.getRotation(),
+                Boolean.TRUE.equals(r.getTransformed()),
                 parseIntMap(r.getCounters()),
                 identity);
     }

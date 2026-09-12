@@ -101,6 +101,7 @@ public class GameEngine {
             case "UNTAP_ALL" -> untapAll(gameId, requireActor(actor), res, me);
             case "ROTATE" -> rotate(actorUserId, res, msg);
             case "SET_FACE_DOWN" -> setFaceDown(actorUserId, res, me, msg);
+            case "FLIP_CARD" -> flipCard(actorUserId, res, me, msg);
             case "CARD_COUNTER" -> cardCounter(actorUserId, res, me, msg);
             case "PLAYER_COUNTER" -> playerCounter(players, actorUserId, res, names, msg);
             case "CHANGE_LIFE" -> changeLife(players, actorUserId, res, names, msg);
@@ -300,6 +301,7 @@ public class GameEngine {
             gc.setX(null);
             gc.setY(null);
             gc.setTapped(false);
+            gc.setTransformed(false);
         } else if (gc.getX() == null || gc.getY() == null) {
             gc.setX(BigDecimal.valueOf(0.42));
             gc.setY(BigDecimal.valueOf(0.35));
@@ -378,6 +380,16 @@ public class GameEngine {
         gc.setRotation(((msg.getInt("rotation", gc.getRotation() + 180)) % 360 + 360) % 360);
         gameCards.save(gc);
         res.card(gc.getId()).eventType("CARD_UPDATED").logLine(null);
+    }
+
+    private void flipCard(long actorUserId, EngineResult res, String me, GameActionMessage msg) {
+        GameCard gc = gameCards.findById(msg.getLong("cardId", -1))
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Carta nao encontrada"));
+        requireControl(gc, actorUserId);
+        gc.setTransformed(!gc.isTransformed());
+        gameCards.save(gc);
+        res.card(gc.getId()).eventType("CARD_UPDATED")
+                .logLine(me + (gc.isTransformed() ? " transformou uma carta" : " voltou a carta pra frente"));
     }
 
     private void setFaceDown(long actorUserId, EngineResult res, String me, GameActionMessage msg) {

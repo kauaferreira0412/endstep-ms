@@ -51,7 +51,15 @@ public final class GameDtos {
             String imageLarge,
             boolean isToken,
             String tokenPt,
-            String tokenColors
+            String tokenColors,
+            boolean hasBackFace,
+            String backName,
+            String backTypeLine,
+            String backManaCost,
+            String backOracleText,
+            String backImageSmall,
+            String backImageNormal,
+            String backImageLarge
     ) {
     }
 
@@ -66,6 +74,7 @@ public final class GameDtos {
             boolean tapped,
             boolean faceDown,
             int rotation,
+            boolean transformed,
             Map<String, Integer> counters,
             CardIdentity identity
     ) {

@@ -38,4 +38,12 @@ public interface GameCardRow {
     String getImageSmall();
     String getImageNormal();
     String getImageLarge();
+    Boolean getTransformed();
+    String getBackName();
+    String getBackTypeLine();
+    String getBackManaCost();
+    String getBackOracleText();
+    String getBackImageSmall();
+    String getBackImageNormal();
+    String getBackImageLarge();
 }

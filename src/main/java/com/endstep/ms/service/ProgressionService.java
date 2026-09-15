@@ -15,10 +15,13 @@ import com.endstep.ms.repository.UserRepository;
 import com.endstep.ms.repository.UserStatsRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -41,13 +44,16 @@ public class ProgressionService {
     private final AchievementRepository achievementRepo;
     private final UserAchievementRepository userAchievementRepo;
     private final UserRepository users;
+    private final SimpMessagingTemplate messaging;
 
     public ProgressionService(UserStatsRepository stats, AchievementRepository achievementRepo,
-                              UserAchievementRepository userAchievementRepo, UserRepository users) {
+                              UserAchievementRepository userAchievementRepo, UserRepository users,
+                              SimpMessagingTemplate messaging) {
         this.stats = stats;
         this.achievementRepo = achievementRepo;
         this.userAchievementRepo = userAchievementRepo;
         this.users = users;
+        this.messaging = messaging;
     }
 
     @Transactional
@@ -63,12 +69,13 @@ public class ProgressionService {
                 .orElse(null);
         List<Achievement> catalog = achievementRepo.findAll();
         for (GamePlayer p : players) {
-            awardGame(p.getUserId(), p.getUserId().equals(winnerId), catalog);
+            awardGame(p.getUserId(), p.getUserId().equals(winnerId), game.getId(), catalog);
         }
     }
 
-    private void awardGame(Long userId, boolean won, List<Achievement> catalog) {
+    private void awardGame(Long userId, boolean won, Long gameId, List<Achievement> catalog) {
         UserStats us = statsOf(userId);
+        int levelBefore = us.getLevel();
         us.setGamesPlayed(us.getGamesPlayed() + 1);
         if (won) {
             us.setGamesWon(us.getGamesWon() + 1);
@@ -76,7 +83,32 @@ public class ProgressionService {
         us.setXp(us.getXp() + (won ? WIN_XP : PARTICIPATION_XP));
         us.setLevel(levelForXp(us.getXp()));
         stats.save(us);
-        checkAchievements(userId, us, catalog);
+        List<String> unlocked = new ArrayList<>();
+        checkAchievements(userId, us, catalog, unlocked);
+        notifyProgress(userId, gameId, won, levelBefore, us, unlocked);
+    }
+
+    private void notifyProgress(Long userId, Long gameId, boolean won, int levelBefore, UserStats us,
+                                List<String> unlocked) {
+        int levelAfter = us.getLevel();
+        boolean leveledUp = levelAfter > levelBefore;
+        String titleBefore = titleForLevel(levelBefore);
+        String titleAfter = titleForLevel(levelAfter);
+        boolean titleUp = !titleBefore.equals(titleAfter);
+        if (!leveledUp && unlocked.isEmpty()) {
+            return;
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("won", won);
+        data.put("levelBefore", levelBefore);
+        data.put("levelAfter", levelAfter);
+        data.put("leveledUp", leveledUp);
+        data.put("titleBefore", titleBefore);
+        data.put("titleAfter", titleAfter);
+        data.put("titleUp", titleUp);
+        data.put("unlockedAchievements", unlocked);
+        Map<String, Object> envelope = Map.of("type", "PROGRESSION", "data", data);
+        messaging.convertAndSendToUser(String.valueOf(userId), "/queue/game/" + gameId, envelope);
     }
 
     private UserStats statsOf(Long userId) {
@@ -87,7 +119,7 @@ public class ProgressionService {
         });
     }
 
-    private void checkAchievements(Long userId, UserStats us, List<Achievement> catalog) {
+    private void checkAchievements(Long userId, UserStats us, List<Achievement> catalog, List<String> unlocked) {
         boolean changed = true;
         int guard = 0;
         while (changed && guard++ < 10) {
@@ -107,6 +139,7 @@ public class ProgressionService {
                 ua.setProgress(Math.min(value, a.getTarget()));
                 if (value >= a.getTarget()) {
                     ua.setUnlockedAt(Instant.now());
+                    unlocked.add(a.getName());
                     us.setXp(us.getXp() + a.getXpReward());
                     int newLevel = levelForXp(us.getXp());
                     if (newLevel != us.getLevel()) {

@@ -73,6 +73,9 @@ public class Game {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    @Column(name = "xp_awarded", nullable = false)
+    private boolean xpAwarded = false;
+
     @Column(name = "updated_at")
     private Instant updatedAt;
 

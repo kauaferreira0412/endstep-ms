@@ -52,19 +52,21 @@ public class GameEngine {
     private final GameEventRepository gameEvents;
     private final UserRepository users;
     private final CardOracleRepository cardOracles;
+    private final ProgressionService progression;
     private final TransactionTemplate tx;
 
     private final ConcurrentHashMap<Long, Object> locks = new ConcurrentHashMap<>();
 
     public GameEngine(GameRepository games, GamePlayerRepository gamePlayers, GameCardRepository gameCards,
                       GameEventRepository gameEvents, UserRepository users, CardOracleRepository cardOracles,
-                      PlatformTransactionManager txManager) {
+                      ProgressionService progression, PlatformTransactionManager txManager) {
         this.games = games;
         this.gamePlayers = gamePlayers;
         this.gameCards = gameCards;
         this.gameEvents = gameEvents;
         this.users = users;
         this.cardOracles = cardOracles;
+        this.progression = progression;
         this.tx = new TransactionTemplate(txManager);
     }
 
@@ -479,6 +481,7 @@ public class GameEngine {
             games.findById(justOut.getGameId()).ifPresent(g -> {
                 g.setStatus(Game.Status.FINISHED.name());
                 g.setFinishedAt(java.time.Instant.now());
+                progression.onGameFinished(g, players);
                 games.save(g);
             });
         }
@@ -902,6 +905,7 @@ public class GameEngine {
         if (alive <= 1) {
             game.setStatus(Game.Status.FINISHED.name());
             game.setFinishedAt(java.time.Instant.now());
+            progression.onGameFinished(game, players);
         }
         res.eventType("PLAYER_LEFT").logLine(me + " desistiu da partida");
     }
@@ -919,6 +923,7 @@ public class GameEngine {
         if (alive <= 1) {
             game.setStatus(Game.Status.FINISHED.name());
             game.setFinishedAt(java.time.Instant.now());
+            progression.onGameFinished(game, players);
         } else if (game.getActiveSeat() == actor.getSeat()) {
             passTurn(game, players, res, names);
         }

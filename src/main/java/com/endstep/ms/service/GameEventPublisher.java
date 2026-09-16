@@ -72,6 +72,7 @@ public class GameEventPublisher {
         TurnView turn = result.turnChanged() ? gameView.turnView(game, players) : null;
         LogLine log = result.logLine() == null || result.logLine().isBlank()
                 ? null : new LogLine(result.sequence(), result.logLine(), Instant.now());
+        String winnerUsername = game.getWinnerUserId() != null ? names.get(game.getWinnerUserId()) : null;
 
         for (Long viewerId : gameView.participantUserIds(gameId)) {
             List<GameCardView> cards = new ArrayList<>();
@@ -91,7 +92,8 @@ public class GameEventPublisher {
                 });
             }
             GamePatch patch = new GamePatch(result.sequence(), cards,
-                    new ArrayList<>(result.removedCardIds()), pv, turn, log);
+                    new ArrayList<>(result.removedCardIds()), pv, turn, log,
+                    game.getStatus(), game.getWinnerUserId(), winnerUsername);
             messaging.convertAndSendToUser(String.valueOf(viewerId), dest(gameId), envelope("PATCH", patch));
         }
     }

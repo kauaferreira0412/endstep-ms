@@ -103,7 +103,9 @@ public final class GameDtos {
             List<PlayerView> players,
             List<GameCardView> cards,
             List<LogLine> log,
-            DiceRollView diceRoll
+            DiceRollView diceRoll,
+            Long winnerUserId,
+            String winnerUsername
     ) {
     }
 
@@ -113,7 +115,10 @@ public final class GameDtos {
             java.util.List<Long> removed,
             List<PlayerView> players,
             TurnView turn,
-            LogLine log
+            LogLine log,
+            String status,
+            Long winnerUserId,
+            String winnerUsername
     ) {
     }
 

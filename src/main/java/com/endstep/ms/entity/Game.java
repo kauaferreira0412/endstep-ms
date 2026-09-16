@@ -83,6 +83,9 @@ public class Game {
     @Column(name = "dice_roll", columnDefinition = "jsonb")
     private Map<String, Object> diceRoll;
 
+    @Column(name = "winner_user_id")
+    private Long winnerUserId;
+
     @Column(name = "updated_at")
     private Instant updatedAt;
 

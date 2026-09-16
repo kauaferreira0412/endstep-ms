@@ -5,12 +5,14 @@ import com.endstep.ms.entity.Game;
 import com.endstep.ms.entity.GameCard;
 import com.endstep.ms.entity.GameEvent;
 import com.endstep.ms.entity.GamePlayer;
+import com.endstep.ms.entity.Room;
 import com.endstep.ms.entity.User;
 import com.endstep.ms.repository.CardOracleRepository;
 import com.endstep.ms.repository.GameCardRepository;
 import com.endstep.ms.repository.GameEventRepository;
 import com.endstep.ms.repository.GamePlayerRepository;
 import com.endstep.ms.repository.GameRepository;
+import com.endstep.ms.repository.RoomRepository;
 import com.endstep.ms.repository.UserRepository;
 import com.endstep.ms.service.game.EngineResult;
 import com.endstep.ms.service.game.GameActionMessage;
@@ -53,18 +55,20 @@ public class GameEngine {
     private final UserRepository users;
     private final CardOracleRepository cardOracles;
     private final ProgressionService progression;
+    private final RoomRepository rooms;
     private final TransactionTemplate tx;
 
     private final ConcurrentHashMap<Long, Object> locks = new ConcurrentHashMap<>();
 
     public GameEngine(GameRepository games, GamePlayerRepository gamePlayers, GameCardRepository gameCards,
                       GameEventRepository gameEvents, UserRepository users, CardOracleRepository cardOracles,
-                      ProgressionService progression, PlatformTransactionManager txManager) {
+                      ProgressionService progression, RoomRepository rooms, PlatformTransactionManager txManager) {
         this.games = games;
         this.gamePlayers = gamePlayers;
         this.gameCards = gameCards;
         this.gameEvents = gameEvents;
         this.users = users;
+        this.rooms = rooms;
         this.cardOracles = cardOracles;
         this.progression = progression;
         this.tx = new TransactionTemplate(txManager);
@@ -496,12 +500,26 @@ public class GameEngine {
                 .count();
         if (alive <= 1) {
             games.findById(justOut.getGameId()).ifPresent(g -> {
-                g.setStatus(Game.Status.FINISHED.name());
-                g.setFinishedAt(java.time.Instant.now());
-                progression.onGameFinished(g, players);
+                finishGame(g, players);
                 games.save(g);
             });
         }
+    }
+
+    private void finishGame(Game game, List<GamePlayer> players) {
+        game.setStatus(Game.Status.FINISHED.name());
+        game.setFinishedAt(java.time.Instant.now());
+        List<GamePlayer> stillPlaying = players.stream()
+                .filter(p -> GamePlayer.Status.PLAYING.name().equals(p.getStatus()))
+                .toList();
+        if (stillPlaying.size() == 1) {
+            game.setWinnerUserId(stillPlaying.get(0).getUserId());
+        }
+        rooms.findById(game.getRoomId()).ifPresent(r -> {
+            r.setStatus(Room.Status.CLOSED.name());
+            rooms.save(r);
+        });
+        progression.onGameFinished(game, players);
     }
 
     private void commanderDamage(List<GamePlayer> players, EngineResult res, Map<Long, String> names,
@@ -920,9 +938,7 @@ public class GameEngine {
         res.player(actor.getUserId());
         long alive = players.stream().filter(p -> GamePlayer.Status.PLAYING.name().equals(p.getStatus())).count();
         if (alive <= 1) {
-            game.setStatus(Game.Status.FINISHED.name());
-            game.setFinishedAt(java.time.Instant.now());
-            progression.onGameFinished(game, players);
+            finishGame(game, players);
         }
         res.eventType("PLAYER_LEFT").logLine(me + " desistiu da partida");
     }
@@ -938,9 +954,7 @@ public class GameEngine {
                 .filter(p -> GamePlayer.Status.PLAYING.name().equals(p.getStatus()))
                 .count();
         if (alive <= 1) {
-            game.setStatus(Game.Status.FINISHED.name());
-            game.setFinishedAt(java.time.Instant.now());
-            progression.onGameFinished(game, players);
+            finishGame(game, players);
         } else if (game.getActiveSeat() == actor.getSeat()) {
             passTurn(game, players, res, names);
         }

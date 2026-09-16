@@ -110,6 +110,7 @@ public class GameView {
             }
         }
 
+        User winner = game.getWinnerUserId() != null ? userById.get(game.getWinnerUserId()) : null;
         return new GameSnapshot(
                 gameId,
                 room != null ? room.getRoomCode() : null,
@@ -121,7 +122,9 @@ public class GameView {
                 playerViews,
                 cardViews,
                 log,
-                diceRollView(game));
+                diceRollView(game),
+                game.getWinnerUserId(),
+                winner != null ? winner.getUsername() : null);
     }
 
     private DiceRollView diceRollView(Game game) {

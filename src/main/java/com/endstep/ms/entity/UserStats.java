@@ -3,6 +3,7 @@ package com.endstep.ms.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -40,6 +41,11 @@ public class UserStats {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @PrePersist
+    void onCreate() {
+        updatedAt = Instant.now();
+    }
 
     @PreUpdate
     void onUpdate() {

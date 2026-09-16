@@ -11,8 +11,11 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * Partida (estado autoritativo persistido; secao 31).
@@ -75,6 +78,10 @@ public class Game {
 
     @Column(name = "xp_awarded", nullable = false)
     private boolean xpAwarded = false;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "dice_roll", columnDefinition = "jsonb")
+    private Map<String, Object> diceRoll;
 
     @Column(name = "updated_at")
     private Instant updatedAt;

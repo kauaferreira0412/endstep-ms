@@ -80,6 +80,15 @@ public class GamePlayer {
     @Column(nullable = false)
     private boolean connected = true;
 
+    @Column(nullable = false)
+    private boolean afk = false;
+
+    @Column(name = "last_active_at")
+    private Instant lastActiveAt;
+
+    @Column(name = "controller_user_id")
+    private Long controllerUserId;
+
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 

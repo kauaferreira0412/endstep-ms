@@ -3,6 +3,7 @@ package com.endstep.ms.repository;
 import com.endstep.ms.entity.Game;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -13,4 +14,6 @@ import java.util.Optional;
  */
 public interface GameRepository extends JpaRepository<Game, Long> {
     Optional<Game> findFirstByRoomIdOrderByIdDesc(Long roomId);
+
+    List<Game> findByStatus(String status);
 }

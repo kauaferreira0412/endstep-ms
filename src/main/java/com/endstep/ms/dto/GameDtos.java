@@ -17,6 +17,12 @@ public final class GameDtos {
     public record TurnView(int turnNumber, int activeSeat, String phase, Long activeUserId) {
     }
 
+    public record DiceRollEntry(Long userId, int value) {
+    }
+
+    public record DiceRollView(List<DiceRollEntry> rolls, Long winnerUserId) {
+    }
+
     public record PlayerView(
             Long userId,
             String username,
@@ -31,7 +37,10 @@ public final class GameDtos {
             int graveyardCount,
             int exileCount,
             int commandCount,
-            int battlefieldCount
+            int battlefieldCount,
+            boolean afk,
+            Long controllerUserId,
+            String controllerUsername
     ) {
     }
 
@@ -93,7 +102,8 @@ public final class GameDtos {
             TurnView turn,
             List<PlayerView> players,
             List<GameCardView> cards,
-            List<LogLine> log
+            List<LogLine> log,
+            DiceRollView diceRoll
     ) {
     }
 

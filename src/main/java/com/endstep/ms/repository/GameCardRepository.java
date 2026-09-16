@@ -19,6 +19,8 @@ public interface GameCardRepository extends JpaRepository<GameCard, Long> {
 
     List<GameCard> findByGameIdAndZoneAndOwnerUserId(Long gameId, String zone, Long ownerUserId);
 
+    List<GameCard> findByGameIdAndOwnerUserId(Long gameId, Long ownerUserId);
+
     long countByGameIdAndZoneAndOwnerUserId(Long gameId, String zone, Long ownerUserId);
 
     @Query(value = """

@@ -1,6 +1,8 @@
 package com.endstep.ms.service;
 
 import com.endstep.ms.dto.GameDtos.CardIdentity;
+import com.endstep.ms.dto.GameDtos.DiceRollEntry;
+import com.endstep.ms.dto.GameDtos.DiceRollView;
 import com.endstep.ms.dto.GameDtos.GameCardView;
 import com.endstep.ms.dto.GameDtos.GameSnapshot;
 import com.endstep.ms.dto.GameDtos.LogLine;
@@ -80,13 +82,18 @@ public class GameView {
         List<GamePlayer> players = gamePlayers.findByGameIdOrderBySeat(gameId);
         List<GameCardRow> rows = gameCards.loadRows(gameId);
 
-        Map<Long, User> userById = users.findAllById(players.stream().map(GamePlayer::getUserId).toList())
+        List<Long> userIds = new ArrayList<>(players.stream().map(GamePlayer::getUserId).toList());
+        players.stream().map(GamePlayer::getControllerUserId).filter(java.util.Objects::nonNull)
+                .forEach(userIds::add);
+        Map<Long, User> userById = users.findAllById(userIds)
                 .stream().collect(Collectors.toMap(User::getId, Function.identity()));
 
         List<PlayerView> playerViews = new ArrayList<>();
         for (GamePlayer gp : players) {
             User u = userById.get(gp.getUserId());
-            playerViews.add(playerView(gp, u != null ? u.getUsername() : ("user#" + gp.getUserId()), rows));
+            User controller = gp.getControllerUserId() != null ? userById.get(gp.getControllerUserId()) : null;
+            playerViews.add(playerView(gp, u != null ? u.getUsername() : ("user#" + gp.getUserId()),
+                    controller != null ? controller.getUsername() : null, rows));
         }
 
         List<GameCardView> cardViews = new ArrayList<>(rows.size());
@@ -113,7 +120,26 @@ public class GameView {
                 turnView(game, players),
                 playerViews,
                 cardViews,
-                log);
+                log,
+                diceRollView(game));
+    }
+
+    private DiceRollView diceRollView(Game game) {
+        Map<String, Object> raw = game.getDiceRoll();
+        if (raw == null) {
+            return null;
+        }
+        List<DiceRollEntry> entries = new ArrayList<>();
+        if (raw.get("rolls") instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m && m.get("userId") instanceof Number uid
+                        && m.get("value") instanceof Number val) {
+                    entries.add(new DiceRollEntry(uid.longValue(), val.intValue()));
+                }
+            }
+        }
+        Long winnerId = raw.get("winnerUserId") instanceof Number n ? n.longValue() : null;
+        return new DiceRollView(entries, winnerId);
     }
 
     public TurnView turnView(Game game, List<GamePlayer> players) {
@@ -124,7 +150,8 @@ public class GameView {
         return new TurnView(game.getTurnNumber(), game.getActiveSeat(), game.getPhase(), activeUserId);
     }
 
-    public PlayerView playerView(GamePlayer gp, String username, List<GameCardRow> allRows) {
+    public PlayerView playerView(GamePlayer gp, String username, String controllerUsername,
+                                 List<GameCardRow> allRows) {
         int lib = 0, hand = 0, gy = 0, exile = 0, cmd = 0, bf = 0;
         for (GameCardRow r : allRows) {
             if (!gp.getUserId().equals(r.getOwnerUserId())) {
@@ -142,19 +169,21 @@ public class GameView {
         }
         return new PlayerView(
                 gp.getUserId(), username, gp.getSeat(), gp.getLifeTotal(), gp.isConnected(), gp.getStatus(),
-                gp.getCommanderDamage(), gp.getCounters(), lib, hand, gy, exile, cmd, bf);
+                gp.getCommanderDamage(), gp.getCounters(), lib, hand, gy, exile, cmd, bf,
+                gp.isAfk(), gp.getControllerUserId(), controllerUsername);
     }
 
     public GameCardView cardView(GameCardRow r, long viewerId) {
         boolean revealed = parseLongList(r.getRevealedTo()).contains(viewerId);
         boolean owner = r.getOwnerUserId() != null && r.getOwnerUserId() == viewerId;
+        boolean controls = r.getControllerUserId() != null && r.getControllerUserId() == viewerId;
         GameCard.Zone zone = GameCard.Zone.valueOf(r.getZone());
         boolean faceDown = Boolean.TRUE.equals(r.getFaceDown());
 
         boolean showIdentity = switch (zone) {
             case LIBRARY -> revealed;
-            case HAND -> owner || revealed;
-            default -> !faceDown || owner || revealed;
+            case HAND -> owner || controls || revealed;
+            default -> !faceDown || owner || controls || revealed;
         };
 
         boolean isToken = Boolean.TRUE.equals(r.getToken());

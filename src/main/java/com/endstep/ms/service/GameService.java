@@ -21,7 +21,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -93,12 +96,44 @@ public class GameService {
         FormatEntity fmt = formats.findById(room.getFormat())
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "Formato invalido"));
 
+        Random rnd = new Random();
+        Map<Long, Integer> rolls = new LinkedHashMap<>();
+        for (RoomPlayer rp : players) {
+            rolls.put(rp.getUserId(), 1 + rnd.nextInt(20));
+        }
+        int best = rolls.values().stream().mapToInt(Integer::intValue).max().orElse(1);
+        Long winnerId = rolls.entrySet().stream()
+                .filter(e -> e.getValue() == best)
+                .map(Map.Entry::getKey)
+                .min(Long::compareTo)
+                .orElse(players.get(0).getUserId());
+        int winnerSeat = 0;
+        for (int i = 0; i < players.size(); i++) {
+            if (players.get(i).getUserId().equals(winnerId)) {
+                winnerSeat = i;
+                break;
+            }
+        }
+
         Game game = new Game();
         game.setRoomId(room.getId());
         game.setFormat(room.getFormat());
         game.setStatus(Game.Status.ACTIVE.name());
         game.setCreatedBy(hostUserId);
         game.setStartedAt(Instant.now());
+        game.setActiveSeat(winnerSeat);
+        List<Map<String, Object>> rollList = rolls.entrySet().stream()
+                .map(e -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("userId", e.getKey());
+                    m.put("value", e.getValue());
+                    return m;
+                })
+                .toList();
+        Map<String, Object> diceRoll = new LinkedHashMap<>();
+        diceRoll.put("rolls", rollList);
+        diceRoll.put("winnerUserId", winnerId);
+        game.setDiceRoll(diceRoll);
         games.save(game);
 
         int seat = 0;

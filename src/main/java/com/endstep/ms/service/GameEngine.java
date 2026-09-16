@@ -84,12 +84,28 @@ public class GameEngine {
             throw new ResponseStatusException(CONFLICT, "Partida nao esta ativa");
         }
         List<GamePlayer> players = gamePlayers.findByGameIdOrderBySeat(gameId);
-        GamePlayer actor = players.stream().filter(p -> p.getUserId() == actorUserId).findFirst().orElse(null);
-        Map<Long, String> names = users.findAllById(players.stream().map(GamePlayer::getUserId).toList())
+        GamePlayer actor = players.stream()
+                .filter(p -> p.getUserId() == actorUserId
+                        || (p.getControllerUserId() != null && p.getControllerUserId() == actorUserId))
+                .findFirst().orElse(null);
+        List<Long> nameIds = new ArrayList<>(players.stream().map(GamePlayer::getUserId).toList());
+        nameIds.add(actorUserId);
+        Map<Long, String> names = users.findAllById(nameIds)
                 .stream().collect(Collectors.toMap(User::getId, User::getUsername, (a, b) -> a));
         String me = names.getOrDefault(actorUserId, "user#" + actorUserId);
+        if (actor != null && actor.getControllerUserId() != null && actor.getControllerUserId() == actorUserId) {
+            me = names.getOrDefault(actor.getUserId(), "user#" + actor.getUserId()) + " (via " + me + ")";
+        }
 
         EngineResult res = new EngineResult().eventType(msg.type());
+        if (actor != null) {
+            actor.setLastActiveAt(java.time.Instant.now());
+            if (actor.isAfk()) {
+                actor.setAfk(false);
+                res.player(actor.getUserId());
+            }
+            gamePlayers.save(actor);
+        }
         String type = msg.type() == null ? "" : msg.type().toUpperCase();
 
         switch (type) {
@@ -125,6 +141,7 @@ public class GameEngine {
             case "REORDER_HAND" -> reorderHand(game, actorUserId, res, msg);
             case "SURRENDER" -> surrender(game, players, requireActor(actor), res, me);
             case "LEAVE_GAME" -> leaveGame(game, players, requireActor(actor), res, me, names);
+            case "PASS_CONTROL" -> passControl(game, players, actorUserId, res, names, msg);
             default -> throw new ResponseStatusException(BAD_REQUEST, "Acao desconhecida: " + msg.type());
         }
 
@@ -928,6 +945,48 @@ public class GameEngine {
             passTurn(game, players, res, names);
         }
         res.eventType("PLAYER_LEFT").logLine(me + " saiu da partida");
+    }
+
+    private void passControl(Game game, List<GamePlayer> players, long actorUserId, EngineResult res,
+                             Map<Long, String> names, GameActionMessage msg) {
+        Long targetUserId = msg.getLongOrNull("targetUserId");
+        if (targetUserId == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "Informe o jogador");
+        }
+        GamePlayer target = players.stream().filter(p -> p.getUserId().equals(targetUserId)).findFirst()
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "Jogador invalido"));
+
+        boolean reclaiming = targetUserId == actorUserId;
+        if (!reclaiming) {
+            boolean actorIsSeated = players.stream().anyMatch(p -> p.getUserId() == actorUserId);
+            if (actorIsSeated) {
+                throw new ResponseStatusException(FORBIDDEN, "So espectadores podem assumir a mao de outro jogador");
+            }
+            if (!target.isAfk()) {
+                throw new ResponseStatusException(CONFLICT, "Esse jogador nao esta ausente (AFK)");
+            }
+        }
+
+        Long newController = reclaiming ? null : actorUserId;
+        target.setControllerUserId(newController);
+        gamePlayers.save(target);
+
+        List<GameCard> cards = gameCards.findByGameIdAndOwnerUserId(game.getId(), targetUserId);
+        for (GameCard c : cards) {
+            c.setControllerUserId(newController);
+        }
+        gameCards.saveAll(cards);
+        for (GameCard c : cards) {
+            res.card(c.getId());
+        }
+        res.player(targetUserId);
+
+        String targetName = names.getOrDefault(targetUserId, "user#" + targetUserId);
+        String logLine = reclaiming
+                ? targetName + " retomou o controle da propria mao"
+                : names.getOrDefault(actorUserId, "user#" + actorUserId) + " assumiu a mao de " + targetName
+                        + " (estava AFK)";
+        res.eventType("CONTROL_CHANGED").logLine(logLine);
     }
 
     private static double clamp01(double v) {

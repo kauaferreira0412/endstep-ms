@@ -63,7 +63,10 @@ public class GameEventPublisher {
         List<GamePlayer> players = gamePlayers.findByGameIdOrderBySeat(gameId);
         Map<Long, GameCardRow> rowsById = gameView.rowsById(gameId);
         List<GameCardRow> allRows = new ArrayList<>(rowsById.values());
-        Map<Long, String> names = users.findAllById(players.stream().map(GamePlayer::getUserId).toList())
+        List<Long> nameIds = new ArrayList<>(players.stream().map(GamePlayer::getUserId).toList());
+        players.stream().map(GamePlayer::getControllerUserId).filter(java.util.Objects::nonNull)
+                .forEach(nameIds::add);
+        Map<Long, String> names = users.findAllById(nameIds)
                 .stream().collect(Collectors.toMap(User::getId, User::getUsername, (a, b) -> a));
 
         TurnView turn = result.turnChanged() ? gameView.turnView(game, players) : null;
@@ -80,8 +83,12 @@ public class GameEventPublisher {
             }
             List<PlayerView> pv = new ArrayList<>();
             for (Long uid : result.changedPlayerUserIds()) {
-                players.stream().filter(p -> p.getUserId().equals(uid)).findFirst().ifPresent(gp ->
-                        pv.add(gameView.playerView(gp, names.getOrDefault(uid, "user#" + uid), allRows)));
+                players.stream().filter(p -> p.getUserId().equals(uid)).findFirst().ifPresent(gp -> {
+                    String controllerName = gp.getControllerUserId() != null
+                            ? names.get(gp.getControllerUserId()) : null;
+                    pv.add(gameView.playerView(gp, names.getOrDefault(uid, "user#" + uid), controllerName,
+                            allRows));
+                });
             }
             GamePatch patch = new GamePatch(result.sequence(), cards,
                     new ArrayList<>(result.removedCardIds()), pv, turn, log);
